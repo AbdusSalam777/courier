@@ -2,8 +2,26 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
+
+// Ensure upload directories exist
+const uploadDirs = [
+  'uploads',
+  'uploads/bulk',
+  'uploads/labels',
+  'uploads/receipts'
+];
+
+uploadDirs.forEach(dir => {
+  const dirPath = path.join(__dirname, '..', dir);
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+    console.log(`Created directory: ${dirPath}`);
+  }
+});
 
 // Middleware
 app.use(cors());
@@ -11,6 +29,8 @@ app.use(express.json());
 app.use(morgan('dev'));
 app.use('/uploads', express.static('uploads'));
 app.use('/uploads/receipts', express.static('uploads/receipts'));
+app.use('/uploads/labels', express.static('uploads/labels'));
+app.use('/uploads/bulk', express.static('uploads/bulk'));
 
 // Basic Route
 app.get('/', (req, res) => {

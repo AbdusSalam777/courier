@@ -216,17 +216,29 @@ exports.bulkUploadShipments = async (req, res, next) => {
   fs.createReadStream(req.file.path)
     .pipe(csv())
     .on('data', (data) => results.push(data))
+    .on('error', (error) => {
+      console.error('CSV Read Error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: 'Error reading CSV file', error: error.message });
+      }
+    })
     .on('end', async () => {
       let processed = 0;
       let failed = 0;
 
+      if (results.length === 0) {
+        return res.status(400).json({ message: 'CSV file is empty' });
+      }
+
       let customerDetails = null;
       let customerTariffs = [];
       try {
-        const { rows: tRows } = await db.query('SELECT * FROM tariffs WHERE customer_id = $1 ORDER BY start_weight ASC', [customer_id]);
-        customerTariffs = tRows;
+        if (customer_id) {
+          const { rows: tRows } = await db.query('SELECT * FROM tariffs WHERE customer_id = $1 ORDER BY start_weight ASC', [customer_id]);
+          customerTariffs = tRows;
+        }
       } catch(e) {
-        console.error('Failed to fetch tariffs for bulk upload');
+        console.error('Failed to fetch tariffs for bulk upload:', e.message);
       }
 
       if (req.user.role === 'customer') {
@@ -245,9 +257,9 @@ exports.bulkUploadShipments = async (req, res, next) => {
         try {
           const tracking_id = 'TRK' + Date.now().toString().slice(-10) + index;
           
-          const sName = customerDetails ? customerDetails.sender_name : row.sender_name;
-          const sPhone = customerDetails ? customerDetails.sender_phone : row.sender_phone;
-          const sAddress = customerDetails ? customerDetails.sender_address : row.sender_address;
+          const sName = customerDetails ? customerDetails.sender_name : (row.sender_name || 'N/A');
+          const sPhone = customerDetails ? customerDetails.sender_phone : (row.sender_phone || 'N/A');
+          const sAddress = customerDetails ? customerDetails.sender_address : (row.sender_address || 'N/A');
 
           const weight = parseFloat(row.weight || 0);
           let shippingRate = 0;
@@ -275,14 +287,15 @@ exports.bulkUploadShipments = async (req, res, next) => {
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id`,
             [
               tracking_id, customer_id, sName, sPhone, sAddress,
-              row.receiver_name, row.receiver_phone, row.receiver_address, 
-              weight, row.parcel_type,
+              row.receiver_name || 'N/A', row.receiver_phone || 'N/A', row.receiver_address || 'N/A', 
+              weight, row.parcel_type || 'Parcel',
               payment_type, cod_amount,
               row.origin_branch_id || null, row.destination_branch_id || null, 'BOOKED'
             ]
           );
           processed++;
         } catch (err) {
+          console.error(`Bulk Upload Row ${index + 1} Error:`, err.message);
           failed++;
           await db.query(
             'INSERT INTO bulk_shipment_errors (bulk_id, row_number, error_message, row_data) VALUES ($1, $2, $3, $4)',

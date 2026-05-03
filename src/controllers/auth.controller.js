@@ -23,7 +23,10 @@ const generateRefreshToken = async (userId) => {
 
 exports.register = async (req, res, next) => {
   try {
-    const { name, email, phone, password } = req.body;
+    const { 
+      name, email, phone, password,
+      company_name, pickup_address, cnic, bank_account_no, account_title, bank_branch_name
+    } = req.body;
 
     // Check if user exists
     const userExists = await User.findByEmail(email);
@@ -31,7 +34,10 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    const user = await User.create({ name, email, phone, password, role: 'customer' });
+    const user = await User.create({ 
+      name, email, phone, password, role: 'customer',
+      company_name, pickup_address, cnic, bank_account_no, account_title, bank_branch_name
+    });
     const token = generateToken(user.id);
     const refreshToken = await generateRefreshToken(user.id);
 
@@ -41,7 +47,10 @@ exports.register = async (req, res, next) => {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        phone: user.phone,
+        company_name: user.company_name,
+        pickup_address: user.pickup_address
       },
       token,
       refreshToken
@@ -69,6 +78,10 @@ exports.login = async (req, res, next) => {
       return res.status(403).json({ message: 'Account is deactivated' });
     }
 
+    if (!user.is_approved) {
+      return res.status(403).json({ message: 'Account is pending approval from Admin' });
+    }
+
     const refreshToken = await generateRefreshToken(user.id);
 
     res.json({
@@ -77,7 +90,10 @@ exports.login = async (req, res, next) => {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        phone: user.phone,
+        company_name: user.company_name,
+        pickup_address: user.pickup_address
       },
       token: generateToken(user.id),
       refreshToken

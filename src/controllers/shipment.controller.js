@@ -7,7 +7,7 @@ const { generateLabel } = require('../utils/labelGenerator');
 
 exports.createShipment = async (req, res, next) => {
   try {
-    const {
+    let {
       sender_name, sender_phone, sender_address,
       receiver_name, receiver_phone, receiver_address,
       weight, parcel_type, payment_type, cod_amount,
@@ -16,6 +16,17 @@ exports.createShipment = async (req, res, next) => {
 
     const tracking_id = 'TRK' + Date.now().toString().slice(-10);
     const customer_id = req.user.role === 'customer' ? req.user.id : req.body.customer_id;
+
+    // If user is a customer, enforce their profile details as sender info
+    if (req.user.role === 'customer') {
+      const { rows: userRows } = await db.query('SELECT name, company_name, phone, pickup_address FROM users WHERE id = $1', [req.user.id]);
+      if (userRows.length > 0) {
+        const u = userRows[0];
+        sender_name = `${u.name} (${u.company_name || 'Individual'})`;
+        sender_phone = u.phone;
+        sender_address = u.pickup_address;
+      }
+    }
 
     const query = `
       INSERT INTO shipments (
@@ -209,21 +220,64 @@ exports.bulkUploadShipments = async (req, res, next) => {
       let processed = 0;
       let failed = 0;
 
+      let customerDetails = null;
+      let customerTariffs = [];
+      try {
+        const { rows: tRows } = await db.query('SELECT * FROM tariffs WHERE customer_id = $1 ORDER BY start_weight ASC', [customer_id]);
+        customerTariffs = tRows;
+      } catch(e) {
+        console.error('Failed to fetch tariffs for bulk upload');
+      }
+
+      if (req.user.role === 'customer') {
+        const { rows: userRows } = await db.query('SELECT name, company_name, phone, pickup_address FROM users WHERE id = $1', [req.user.id]);
+        if (userRows.length > 0) {
+          const u = userRows[0];
+          customerDetails = {
+            sender_name: `${u.name} (${u.company_name || 'Individual'})`,
+            sender_phone: u.phone,
+            sender_address: u.pickup_address
+          };
+        }
+      }
+
       for (const [index, row] of results.entries()) {
         try {
           const tracking_id = 'TRK' + Date.now().toString().slice(-10) + index;
           
+          const sName = customerDetails ? customerDetails.sender_name : row.sender_name;
+          const sPhone = customerDetails ? customerDetails.sender_phone : row.sender_phone;
+          const sAddress = customerDetails ? customerDetails.sender_address : row.sender_address;
+
+          const weight = parseFloat(row.weight || 0);
+          let shippingRate = 0;
+          
+          // Calculate rate from tariffs
+          const matchedTariff = customerTariffs.find(t => weight >= parseFloat(t.start_weight) && weight <= parseFloat(t.end_weight));
+          if (matchedTariff) {
+            shippingRate = parseFloat(matchedTariff.rate || 0);
+          }
+
+          const payment_type = row.payment_type || 'COD';
+          let cod_amount = parseFloat(row.cod_amount || 0);
+          
+          if (payment_type === 'COD') {
+            cod_amount += shippingRate;
+          } else {
+            cod_amount = 0;
+          }
+
           await db.query(
             `INSERT INTO shipments (
               tracking_id, customer_id, sender_name, sender_phone, sender_address,
               receiver_name, receiver_phone, receiver_address, weight, parcel_type,
               payment_type, cod_amount, origin_branch_id, destination_branch_id, status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id`,
             [
-              tracking_id, customer_id, row.sender_name, row.sender_phone, row.sender_address,
+              tracking_id, customer_id, sName, sPhone, sAddress,
               row.receiver_name, row.receiver_phone, row.receiver_address, 
-              parseFloat(row.weight || 0), row.parcel_type,
-              row.payment_type || 'COD', parseFloat(row.cod_amount || 0),
+              weight, row.parcel_type,
+              payment_type, cod_amount,
               row.origin_branch_id || null, row.destination_branch_id || null, 'BOOKED'
             ]
           );

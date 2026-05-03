@@ -43,7 +43,7 @@ exports.getWarehouseShipments = async (req, res, next) => {
   try {
     const { branchId } = req.params;
     const { rows } = await db.query(
-      "SELECT * FROM shipments WHERE current_branch_id = $1 AND status = 'IN_WAREHOUSE'",
+      "SELECT * FROM shipments WHERE current_branch_id = $1 AND status IN ('IN_WAREHOUSE', 'FAILED', 'RETURNED')",
       [branchId]
     );
     res.json(rows);

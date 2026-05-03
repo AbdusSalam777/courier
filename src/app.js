@@ -27,6 +27,7 @@ const loadingRoutes = require('./routes/loading.routes');
 const runsheetRoutes = require('./routes/runsheet.routes');
 const financialRoutes = require('./routes/financial.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
+const tariffRoutes = require('./routes/tariff.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -37,6 +38,7 @@ app.use('/api/loading-sheets', loadingRoutes);
 app.use('/api/runsheets', runsheetRoutes);
 app.use('/api/financials', financialRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/tariffs', tariffRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {

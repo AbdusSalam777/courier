@@ -46,9 +46,10 @@ const generateLabel = async (shipment) => {
       doc.moveDown(1);
 
       // Additional Info
-      doc.rect(10, doc.y, 260, 40).stroke();
-      doc.fontSize(12).text(`COD: ${shipment.payment_type === 'COD' ? shipment.cod_amount : 'PREPAID'}`, 20, doc.y + 10);
-      doc.text(`Weight: ${shipment.weight}kg`, 150, doc.y - 15);
+      doc.rect(10, doc.y, 260, 60).stroke();
+      doc.fontSize(12).text(`COD: ${shipment.payment_type === 'COD' ? 'Rs. ' + shipment.cod_amount : 'PREPAID'}`, 20, doc.y + 10);
+      doc.text(`Weight: ${shipment.weight}kg`, 150, doc.y - 12);
+      doc.text(`Parcel Type: ${shipment.parcel_type || 'N/A'}`, 20, doc.y + 10);
 
       doc.end();
 

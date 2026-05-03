@@ -1,49 +1,25 @@
-const { Client } = require('pg');
-require('dotenv').config();
+const db = require('./src/config/db');
 
-const client = new Client({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_DATABASE,
-  password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT,
-});
-
-async function migrate() {
+const migrate = async () => {
   try {
-    await client.connect();
-    console.log('Connected to database');
-
-    // Add rider to enum (PostgreSQL doesn't support adding enum values in a transaction)
-    try {
-      await client.query("ALTER TYPE user_role ADD VALUE 'rider'");
-      console.log("Added 'rider' to user_role enum");
-    } catch (e) {
-      if (e.code === '42710') {
-        console.log("'rider' already exists in enum");
-      } else {
-        throw e;
-      }
-    }
-
-    // Add id_card_number to users
-    try {
-      await client.query("ALTER TABLE users ADD COLUMN id_card_number TEXT");
-      console.log("Added id_card_number column to users table");
-    } catch (e) {
-      if (e.code === '42701') {
-        console.log("id_card_number column already exists");
-      } else {
-        throw e;
-      }
-    }
-
-    console.log('Migration completed successfully');
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS tariffs (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        customer_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        tariff_type VARCHAR(50) DEFAULT 'STANDARD',
+        start_weight DECIMAL(10,2) NOT NULL,
+        end_weight DECIMAL(10,2) NOT NULL,
+        additional_factor DECIMAL(10,2) DEFAULT 0,
+        rate DECIMAL(10,2) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('Migration successful');
+    process.exit(0);
   } catch (err) {
-    console.error('Migration failed:', err);
-  } finally {
-    await client.end();
+    console.error(err);
+    process.exit(1);
   }
-}
+};
 
 migrate();

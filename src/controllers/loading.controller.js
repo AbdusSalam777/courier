@@ -59,6 +59,39 @@ exports.getLoadingSheets = async (req, res, next) => {
   }
 };
 
+exports.getLoadingSheetById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const query = `
+      SELECT ls.*, b1.name as from_branch_name, b2.name as to_branch_name 
+      FROM loading_sheets ls
+      JOIN branches b1 ON ls.from_branch_id = b1.id
+      JOIN branches b2 ON ls.to_branch_id = b2.id
+      WHERE ls.id = $1
+    `;
+    const { rows } = await db.query(query, [id]);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Loading sheet not found' });
+    }
+
+    const sheet = rows[0];
+
+    const itemsQuery = `
+      SELECT s.*
+      FROM loading_sheet_items lsi
+      JOIN shipments s ON lsi.shipment_id = s.id
+      WHERE lsi.loading_sheet_id = $1
+    `;
+    const { rows: items } = await db.query(itemsQuery, [id]);
+    sheet.items = items;
+
+    res.json(sheet);
+  } catch (error) {
+    next(error);
+  }
+};
+
 exports.updateLoadingSheetStatus = async (req, res, next) => {
   const client = await db.pool.connect();
   try {

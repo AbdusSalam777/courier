@@ -44,6 +44,13 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL,
     role user_role NOT NULL,
     status BOOLEAN DEFAULT true,
+    company_name TEXT,
+    pickup_address TEXT,
+    cnic TEXT,
+    bank_account_no TEXT,
+    account_title TEXT,
+    bank_branch_name TEXT,
+    is_approved BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -265,3 +272,15 @@ CREATE INDEX IF NOT EXISTS idx_shipments_dest_branch ON shipments(destination_br
 CREATE INDEX IF NOT EXISTS idx_run_sheets_rider ON run_sheets(rider_id);
 CREATE INDEX IF NOT EXISTS idx_run_sheets_date ON run_sheets(date);
 CREATE INDEX IF NOT EXISTS idx_shipment_updates_shipment_id ON shipment_updates(shipment_id);
+
+-- Tariffs
+CREATE TABLE IF NOT EXISTS tariffs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    customer_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    tariff_type VARCHAR(50) DEFAULT 'STANDARD',
+    start_weight DECIMAL(10,2) NOT NULL,
+    end_weight DECIMAL(10,2) NOT NULL,
+    additional_factor DECIMAL(10,2) DEFAULT 0,
+    rate DECIMAL(10,2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

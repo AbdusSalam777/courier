@@ -16,8 +16,8 @@ const initDB = async () => {
     console.log('Seeding database...');
     const adminPass = await bcrypt.hash('admin123', 10);
     await db.query(`
-      INSERT INTO users (name, email, password_hash, role)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO users (name, email, password_hash, role, is_approved, status)
+      VALUES ($1, $2, $3, $4, true, true)
       ON CONFLICT (email) DO NOTHING
     `, ['Super Admin', 'admin@courier.com', adminPass, 'admin']);
 
